@@ -1,0 +1,49 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sqlserver
+    ports:
+      - "1433:1433"
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=AFSTYWQ576123S!
+    healthcheck:
+      test: ["CMD-SHELL", "exit 0"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  sql-init:
+    image: mcr.microsoft.com/mssql-tools
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    volumes:
+      - ./init-db.sql:/init-db.sql
+    entrypoint: >
+      /bin/sh -c "
+      sleep 10 &&
+      /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P AFSTYWQ576123S! -i /init-db.sql
+      "
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: backend
+    depends_on:
+      sql-init:
+        condition: service_completed_successfully
+    environment:
+      - DB_USER=sa
+      - DB_PASSWORD=AFSTYWQ576123S!
+      - DB_HOST=sqlserver
+      - DB_PORT=1433
+      - DB_NAME=ClientesDB
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+      - .:/app
+    command: >
+      npm run dev
